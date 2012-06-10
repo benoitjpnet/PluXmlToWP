@@ -5,6 +5,13 @@
  * TODO: Handle GMT date.
  **/
 
+/* Set the variables here. */
+$title = "My blog title";
+$description = "Little description of my blog.";
+$link = "http://myblog.com";
+$login = "mynickname";
+$email = "nick@mail.com";
+
 /* Loading the main files of PluXml. */
 include('config.php');
 define('PLX_ROOT', './');
@@ -65,8 +72,20 @@ $xmlWPHeader .= "\t" . 'xmlns:content="http://purl.org/rss/1.0/modules/content/"
 $xmlWPHeader .= "\t" . 'xmlns:wfw="http://wellformedweb.org/CommentAPI/"' . "\n";
 $xmlWPHeader .= "\t" . 'xmlns:dc="http://purl.org/dc/elements/1.1/"' . "\n";
 $xmlWPHeader .= "\t" . 'xmlns:wp="http://wordpress.org/export/1.1/"' . "\n";
-$xmlWPHeader .= '>';
-
+$xmlWPHeader .= '>' . "\n";
+$xmlWPHeader .= '' . "\n";
+$xmlWPHeader .= '<channel>' . "\n";
+$xmlWPHeader .= "\t" . '<title><![CDATA[' . $title . ']]></title>' . "\n";
+$xmlWPHeader .= "\t" . '<link>' . $link . '</link>' . "\n";
+$xmlWPHeader .= "\t" . '<description><![CDATA[' . $description .']]></description>' . "\n";
+$xmlWPHeader .= "\t" . '<pubDate>' . date('r') . '</pubDate>' . "\n";
+$xmlWPHeader .= "\t" . '<language>fr</language>' . "\n";
+$xmlWPHeader .= "\t" . '<wp:wxr_version>1.1</wp:wxr_version>' . "\n";
+$xmlWPHeader .= "\t" . '<wp:base_site_url>' . $link . '</wp:base_site_url>' . "\n";
+$xmlWPHeader .= "\t" . '<wp:base_blog_url>' . $link . '</wp:base_blog_url>' . "\n";
+$xmlWPHeader .= '' . "\n";
+$xmlWPHeader .= "\t" . '<wp:author><wp:author_id>1</wp:author_id><wp:author_login>' . $login . '</wp:author_login><wp:author_email>' . $email . '</wp:author_email><wp:author_display_name><![CDATA[' . $login .']]></wp:author_display_name><wp:author_first_name><![CDATA[]]></wp:author_first_name><wp:author_last_name><![CDATA[]]></wp:author_last_name></wp:author>' . "\n";
+$xmlWPHeader .= '' . "\n" . "\n";
 /*
  * ----------------------------------------------------------------------------
  * XXXXXXXXX
@@ -98,13 +117,49 @@ foreach ($plxGlob->aFiles as $articlesFile) {
 }
 /* Get all categories of articles stocked in PluXml configuration. */
 $categories = $plxMotor->aCats;
+/* Handle ID and generate the list of categories. */
+$xmlWPHeader .= "\t" . '<wp:category><wp:term_id>1</wp:term_id><wp:category_nicename>non-classe</wp:category_nicename><wp:category_parent></wp:category_parent><wp:cat_name><![CDATA[Non classé]]></wp:cat_name></wp:category>' . "\n";
+$catID = 2;
+foreach ($categories as $category) {
+	$xmlWPHeader .= "\t" . '<wp:category><wp:term_id>' . $catID . '</wp:term_id><wp:category_nicename>' . $category['url'] . '</wp:category_nicename><wp:category_parent></wp:category_parent><wp:cat_name><![CDATA[' . $category['name'] . ']]></wp:cat_name></wp:category>' . "\n";
+	$catID++;
+}
+/* Get all tags of articles stocked in PluXml configuration. */
+$plxTags = $plxMotor->aTags;
+/*
+ * Permit to transform a tag into a nicename tag with no Accented UTF-8
+ * characters + space + apostrophe.
+ * ==> http://www.randomsequence.com/articles/
+ * removing-accented-utf-8-characters-with-php/
+ */
+$search = explode(
+	",", " ,',ç,æ,œ,á,é,í,ó,ú,à,è,ì,ò,ù,ä,ë,ï,ö,ü,ÿ,â,ê,î,ô,û,å,e,i,ø,u"
+);
+$replace = explode(
+	",", "-,-,c,ae,oe,a,e,i,o,u,a,e,i,o,u,a,e,i,o,u,y,a,e,i,o,u,a,e,i,o,u"
+);
+/* Store all tags in one array, eliminate dupe and create a nicename. */
+foreach ($plxTags as $plxSetOfTags) {
+	$tags = explode(', ', $plxSetOfTags['tags']);
+	foreach ($tags as $tag) {
+		if (strlen($tag) > 1) {
+			$allTags[$tag] = str_replace($search, $replace, $tag);
+		}
+	}
+}
+/* Handle ID and generate the list of tags. */
+$tagID = 1;
+foreach ($allTags as $key => $value) {
+	$xmlWPHeader .= "\t" . '<wp:tag><wp:term_id>' . $tagID . '</wp:term_id><wp:tag_slug>' . $value . '</wp:tag_slug><wp:tag_name><![CDATA[' . $key . ']]></wp:tag_name></wp:tag>' . "\n";
+	$tagID++;
+}
 /* Get all comments stocked in PluXml xml files. */
-$plxMotor->getCommentaires('/^[0-9]{4}.(.*).xml$/', 'rsort', 0, 0, 'all');
+$plxMotor->getCommentaires('/^[0-9]{4}.(.*).xml$/', 'sort', 0, 0, 'all');
 $allComments = $plxMotor->plxRecord_coms; // Object of type plxRecord!
+$commentID = 1; // Comment ID start to 1, then increment.
 /* For each articles convert to WordPress's XML format. */
 foreach ($articles as $article) {
 	/* Handle attributs of the article. */
-	
 	/*
 	 * Get the date in 'c' format and convert to 'r' format used by
 	 * WordPress.
@@ -117,7 +172,10 @@ foreach ($articles as $article) {
 	 */
 	$articleCategories = explode(',', $article['categorie']);
 	foreach ($articleCategories as $articleCategory) {
-		$articleCategoriesName[] = $categories[$articleCategory]['name'];
+		$articleCategoriesName[] = array(
+			'name' => $categories[$articleCategory]['name'],
+			'nicename' => $categories[$articleCategory]['url']
+		);
 	}
 	/* Get the comments associated with the article. */
 	if ($article['nb_com'] > 0 ) {
@@ -133,41 +191,55 @@ foreach ($articles as $article) {
 		}
 	} else { $thereIsComments = false; }
 	/* Generate an item in WordPress's XML format. */
-	$xmlWPItem = '<item>' . "\n";
-	$xmlWPItem .= "\t" . '<title>' . $article['title'] . '</title>' . "\n";
-	$xmlWPItem .= "\t" . '<pubDate>' . $pubDate . '</pubDate>' . "\n";
-	$xmlWPItem .= "\t" . '<content:encoded><![CDATA[' . $article['content'] . ']]></content:encoded>' . "\n";
+	$xmlWPItem .= "\t" . '<item>' . "\n";
+	$xmlWPItem .= "\t\t" . '<title>' . $article['title'] . '</title>' . "\n";
+	$xmlWPItem .= "\t\t" . '<pubDate>' . $pubDate . '</pubDate>' . "\n";
+	$xmlWPItem .= "\t\t" . '<content:encoded><![CDATA[' . $article['content'] . ']]></content:encoded>' . "\n";
+	$xmlWPItem .= "\t\t" . '<wp:post_date>' . $article['date'] . '</wp:post_date>' . "\n";
+	$xmlWPItem .= "\t\t" . '<wp:post_date_gmt>' . $article['date'] . '</wp:post_date_gmt>' . "\n";
+	$xmlWPItem .= "\t\t" . '<wp:post_type>post</wp:post_type>' . "\n";
+	$xmlWPItem .= "\t\t" . '<wp:comment_status>open</wp:comment_status>' . "\n";
+	$xmlWPItem .= "\t\t" . '<wp:ping_status>open</wp:ping_status>' . "\n";
+	$xmlWPItem .= "\t\t" . '<wp:status>publish</wp:status>' . "\n";
 	foreach ($articleCategoriesName as $category) {
-		$xmlWPItem .= "\t" . '<category><![CDATA[' . $category . ']]></category>' . "\n";
+		$xmlWPItem .= "\t\t" . '<category domain="category" nicename="' . $category['nicename'] . '"><![CDATA[' . $category['name'] . ']]></category>' . "\n";
 	}
-	if ($thereIsComments) {
-		foreach ($articleComments as $comment) {
-			/* Handle date. */
-			$commentDate = new DateTime($comment['date']);
-			$commentDate = $commentDate->format('Y-m-d H:i:s');
-			$xmlWPItem .= "\t" . '<wp:comment>' . "\n";
-			$xmlWPItem .= "\t\t" . '</wp:comment_author><![CDATA[' . $comment['author'] . ']]></wp:comment_author>' . "\n";
-			$xmlWPItem .= "\t\t" . '</wp:comment_author_email>' . $comment['mail'] . '</wp:comment_author_email>' . "\n";
-			$xmlWPItem .= "\t\t" . '</wp:comment_author_url>' . $comment['site'] . '</wp:comment_author_url>' . "\n";
-			$xmlWPItem .= "\t\t" . '</wp:comment_author_IP>' . $comment['ip'] . '</wp:comment_author_IP>' . "\n";
-			$xmlWPItem .= "\t\t" . '</wp:comment_date>' . $commentDate . '</wp:comment_date>' . "\n";
-			$xmlWPItem .= "\t\t" . '</wp:comment_date_gmt>' . $commentDate . '</wp:comment_date_gmt>' . "\n";
-			$xmlWPItem .= "\t\t" . '</wp:comment_content><![CDATA[' . $comment['content'] . ']]></wp:comment_content>' . "\n";
-			$xmlWPItem .= "\t" . '</wp:comment>' . "\n";
+	$articleTags = explode(', ', $article['tags']);
+	foreach ($articleTags as $tag) {
+		if(array_key_exists($tag, $allTags)) {
+			$xmlWPItem .= "\t\t" . '<category domain="post_tag" nicename="' . $allTags[$tag] . '"><![CDATA[' . $tag . ']]></category>' . "\n";
 		}
 	}
-	$xmlWPItem .= '</item>' . "\n";
-	echo $xmlWPItem;
+	/* Handle comments. */
+	if ($thereIsComments) {
+		foreach ($articleComments as $comment) {
+			/* Handle date of comments. */
+			$commentDate = new DateTime($comment['date']);
+			$commentDate = $commentDate->format('Y-m-d H:i:s');
+			$xmlWPItem .= "\t\t" . '<wp:comment>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_id>' . $commentID . '</wp:comment_id>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_author><![CDATA[' . $comment['author'] . ']]></wp:comment_author>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_author_email>' . $comment['mail'] . '</wp:comment_author_email>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_author_url>' . $comment['site'] . '</wp:comment_author_url>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_author_IP>' . $comment['ip'] . '</wp:comment_author_IP>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_date>' . $commentDate . '</wp:comment_date>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_date_gmt>' . $commentDate . '</wp:comment_date_gmt>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_content><![CDATA[' . $comment['content'] . ']]></wp:comment_content>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_approved>1</wp:comment_approved>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_type></wp:comment_type>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_parent>0</wp:comment_parent>' . "\n";
+			$xmlWPItem .= "\t\t\t" . '<wp:comment_user_id>0</wp:comment_user_id>' . "\n";
+			$xmlWPItem .= "\t\t" . '</wp:comment>' . "\n";
+			$commentID++; //Increment commentID.
+		}
+	}
+	$xmlWPItem .= "\t" . '</item>' . "\n";
+	/* Unset variables used for comments and categories name. */
 	unset($articleComments);
 	unset($articleCategoriesName);
 }
-// <item>
-// <pubDate>Wed, 30 Jan 2009 12:00:00 +0000</pubDate>
-// <category>Kites</category>
-// <category>Taiwan</category>
-// <title>Fun times</title>
-// <content:encoded><p>What great times we had...</p><p>And then Bob...</p></content:encoded>
-// </item>
-// <item>...
-//<categorie number="006" active="1" tri="desc" bypage="5" menu="oui" url="coup-de-geule" template="categorie.php"><name><![CDATA[Coup de geule]]></name><description><![CDATA[]]></description><meta_description><![CDATA[]]></meta_description><meta_keywords><![CDATA[]]></meta_keywords></categorie>
+$xmlWPFooter  = '</channel>' . "\n";
+$xmlWPFooter .= '</rss>';
+/* Here we go! Final result. */
+print $xmlWPHeader . $xmlWPItem . $xmlWPFooter;
 ?>
