@@ -17,6 +17,7 @@ include('config.php');
 define('PLX_ROOT', './');
 define('PLX_CORE', PLX_ROOT.'core/');
 define('PLX_CONF', PLX_ROOT.'data/configuration/parametres.xml');
+include(PLX_CORE.'lib/config.php');
 include(PLX_CORE.'lib/class.plx.date.php');
 include(PLX_CORE.'lib/class.plx.glob.php');
 include(PLX_CORE.'lib/class.plx.utils.php');
